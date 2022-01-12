@@ -36,7 +36,10 @@ const WelcomePageNavigationContainer = () => {
             <DrawerStack.Screen
                 component = { WelcomePage }
                 name = { screen.welcome.main }
-                options = { welcomeScreenOptions } />
+                options = {{
+                    ...welcomeScreenOptions,
+                    title: t('welcomepage.main')
+                }} />
             <DrawerStack.Screen
                 component = { SettingsView }
                 name = { screen.welcome.settings }
