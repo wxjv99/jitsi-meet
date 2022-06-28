@@ -18,6 +18,9 @@ package org.jitsi.meet.sdk;
 
 import android.app.Activity;
 import android.app.Application;
+import android.media.MediaCodecInfo;
+import android.media.MediaCodecList;
+import android.os.Build;
 import android.util.Log;
 
 import androidx.annotation.Nullable;
@@ -31,12 +34,18 @@ import com.facebook.react.common.LifecycleState;
 import com.facebook.react.jscexecutor.JSCExecutorFactory;
 import com.facebook.react.modules.core.DeviceEventManagerModule;
 import com.facebook.react.uimanager.ViewManager;
+import com.oney.WebRTCModule.EglUtils;
 import com.oney.WebRTCModule.RTCVideoViewManager;
 import com.oney.WebRTCModule.WebRTCModule;
 
 import org.devio.rn.splashscreen.SplashScreenModule;
+import org.webrtc.EglBase;
+import org.webrtc.HardwareVideoDecoderFactory;
+import org.webrtc.HardwareVideoEncoderFactory;
 import org.webrtc.SoftwareVideoDecoderFactory;
 import org.webrtc.SoftwareVideoEncoderFactory;
+import org.webrtc.VideoDecoderFactory;
+import org.webrtc.VideoEncoderFactory;
 import org.webrtc.audio.AudioDeviceModule;
 import org.webrtc.audio.JavaAudioDeviceModule;
 
@@ -86,8 +95,57 @@ class ReactInstanceManagerHolder {
             .createAudioDeviceModule();
         options.setAudioDeviceModule(adm);
 
-        options.setVideoDecoderFactory(new SoftwareVideoDecoderFactory());
-        options.setVideoEncoderFactory(new SoftwareVideoEncoderFactory());
+        boolean hasH264HWDecoder = false;
+        boolean hasVP8HWDecoder = false;
+        // boolean hasVP9HWDecoder = false;
+
+        boolean hasH264HWEncoder = false;
+        boolean hasVP8HWEncoder = false;
+        // boolean hasVP9HWEncoder = false;
+
+        VideoDecoderFactory videoDecoderFactory = null;
+        VideoEncoderFactory videoEncoderFactory = null;
+
+        EglBase.Context eglContext = EglUtils.getRootEglBaseContext();
+
+        if (eglContext != null) {
+            MediaCodecList mediaCodecList = new MediaCodecList(MediaCodecList.ALL_CODECS);
+            MediaCodecInfo[] mediaCodecInfos = mediaCodecList.getCodecInfos();
+
+            for (MediaCodecInfo mediaCodecInfo : mediaCodecInfos) {
+                String mediaCodecUpperName = mediaCodecInfo.getName().toUpperCase();
+                if(mediaCodecUpperName.startsWith("OMX.") &&
+                    !mediaCodecUpperName.startsWith("OMX.GOOGLE") &&
+                    !mediaCodecUpperName.endsWith("SW")) {
+                    if(mediaCodecUpperName.contains("H264") || mediaCodecUpperName.contains("AVC")) {
+                        hasH264HWDecoder |= !mediaCodecInfo.isEncoder();
+                        hasH264HWEncoder |= mediaCodecInfo.isEncoder();
+                    } else if (mediaCodecUpperName.contains("VP8")) {
+                        hasVP8HWDecoder |= !mediaCodecInfo.isEncoder();
+                        hasVP8HWEncoder |= mediaCodecInfo.isEncoder();
+                    }
+                    //  else if(mediaCodecUpperName.contains(("VP9"))) {
+                    //     hasVP9HWDecoder|= !mediaCodecInfo.isEncoder();
+                    //     hasVP9HWEncoder |= mediaCodecInfo.isEncoder();
+                    // }
+                }
+            }
+        }
+
+        if (hasH264HWDecoder && hasVP8HWDecoder/* && hasVP9HWDecoder*/) {
+            videoDecoderFactory = new HardwareVideoDecoderFactory(eglContext);
+        } else {
+            videoDecoderFactory = new SoftwareVideoDecoderFactory();
+        }
+
+        if (hasH264HWEncoder && hasVP8HWEncoder/* && hasVP9HWEncoder*/) {
+            videoEncoderFactory = new HardwareVideoEncoderFactory(eglContext, false, false);
+        } else  {
+            videoEncoderFactory = new SoftwareVideoEncoderFactory();
+        }
+
+        options.setVideoDecoderFactory(videoDecoderFactory);
+        options.setVideoEncoderFactory(videoEncoderFactory);
 
         nativeModules.add(new WebRTCModule(reactContext, options));
 
