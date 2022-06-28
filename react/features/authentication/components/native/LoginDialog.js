@@ -141,7 +141,7 @@ class LoginDialog extends Component<Props, State> {
                     autoCapitalize = { 'none' }
                     autoCorrect = { false }
                     onChangeText = { this._onUsernameChange }
-                    placeholder = { 'user@domain.com' }
+                    placeholder = { t('dialog.userIdentifier') }
                     spellCheck = { false }
                     value = { this.state.username } />
                 <Dialog.Input
